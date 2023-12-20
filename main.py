@@ -17,6 +17,7 @@ DPI = 300
 W_IN = 4
 H_IN = 6
 
+sio = socketio.Client()
 
 def execute_command(command):
     def monitor_process(proc):
@@ -123,7 +124,6 @@ def process_print(output_image_path):
     # Execute the command
     execute_command(command)
 
-sio = socketio.Client()
 
 @sio.event
 def connect():
@@ -137,6 +137,7 @@ def disconnect():
 def print_image(data):
     try:
         image_data_url = data['image']
+        system_id = data['system_id']
         current_directory = os.path.dirname(os.path.abspath(__file__))
         output_image_path = os.path.join(current_directory, 'print_processed.jpg')
 
@@ -150,6 +151,7 @@ def print_image(data):
             preprocess_print(image, output_image_path)
 
         process_print(output_image_path)
+        sio.emit('print_complete', {system_id: system_id})
     except KeyError:
         print("Error: Missing data in print event")
 
