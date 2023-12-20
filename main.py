@@ -151,7 +151,6 @@ def print_image(data):
             preprocess_print(image, output_image_path)
 
         process_print(output_image_path)
-        sio.emit('print_complete', {system_id: system_id})
     except KeyError:
         print("Error: Missing data in print event")
 
