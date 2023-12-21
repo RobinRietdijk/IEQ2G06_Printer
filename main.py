@@ -11,7 +11,7 @@ from tkinter import filedialog
 import tkinter as tk
 
 # Socket io server address
-SOCKETIO_SERVER_ADDR = 'http://oracle-api.rjrietdijk.com'
+SOCKETIO_SERVER_ADDR = 'http://192.168.150.214:3000'
 # Print settings
 DPI = 300
 W_IN = 4
@@ -134,24 +134,25 @@ def disconnect():
     print("Disconnected from server")
 
 @sio.on('print')
-def print_image(data):
+def print_image(*args):
+    data = args[0]
     try:
         image_data_url = data['image']
         system_id = data['system_id']
         current_directory = os.path.dirname(os.path.abspath(__file__))
-        output_image_path = os.path.join(current_directory, 'print_processed.jpg')
+        raw_image_path = os.path.join(current_directory, 'raw_image.png')
+        output_image_path = os.path.join(current_directory, 'print_processed.png')
 
-        # Decode the image data URL
-        header, encoded = image_data_url.split(",", 1)
-        image_data = base64.b64decode(encoded)
+        # Save the raw image data
+        with open(raw_image_path, 'wb') as file:
+            file.write(image_data_url)
 
         # Create an Image object from the decoded data
-        with Image.open(BytesIO(image_data)) as image:
+        with Image.open(BytesIO(image_data_url)) as image:
             # Preprocess and print the image
             preprocess_print(image, output_image_path)
 
         process_print(output_image_path)
-        sio.emit('print_complete', {system_id: system_id})
     except KeyError:
         print("Error: Missing data in print event")
 
