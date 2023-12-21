@@ -11,7 +11,7 @@ from tkinter import filedialog
 import tkinter as tk
 
 # Socket io server address
-SOCKETIO_SERVER_ADDR = 'http://192.168.150.214:3000'
+SOCKETIO_SERVER_ADDR = 'http://localhost:3000'
 # Print settings
 DPI = 300
 W_IN = 4
@@ -20,35 +20,13 @@ H_IN = 6
 sio = socketio.Client()
 
 def execute_command(command):
-    def monitor_process(proc):
-        while True:
-            output = proc.stdout.readline()
-            if output == '':
-                if proc.poll() is not None:
-                    break
-            else:
-                print(output.strip().decode())
 
-        rc = proc.poll()
-        print(f"Process exited with code {rc}")
-
-    process = subprocess.Popen(
+    subprocess.Popen(
         command, 
         shell=True, 
         stdout=subprocess.PIPE, 
         stderr=subprocess.STDOUT
     )
-
-    # Start a thread to monitor stdout/stderr
-    monitor_thread = threading.Thread(target=monitor_process, args=(process,))
-    monitor_thread.start()
-
-    # While the process is running, print periodic messages
-    while process.poll() is None:
-        print("Printing in progress...")
-        time.sleep(1)
-
-    monitor_thread.join()  # Wait for the monitoring thread to finish
 
 def select_irfanview_executable():
     root = tk.Tk()
@@ -128,6 +106,7 @@ def process_print(output_image_path):
 @sio.event
 def connect():
     print("Connected to server")
+    sio.emit('printer_connect') 
 
 @sio.event
 def disconnect():
@@ -158,5 +137,4 @@ def print_image(*args):
 
 sio.connect(SOCKETIO_SERVER_ADDR)
 keyboard.on_press(on_key_event)
-sio.emit('printer_connect') 
 sio.wait()
