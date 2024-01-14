@@ -2,7 +2,7 @@ import subprocess
 import os
 import time
 import threading
-import socketio
+import paho.mqtt.client as mqtt
 import base64
 import keyboard
 from io import BytesIO
@@ -10,17 +10,43 @@ from PIL import Image
 from tkinter import filedialog
 import tkinter as tk
 
-# Socket io server address
-SOCKETIO_SERVER_ADDR = 'http://localhost:3000'
+MQTT_BROKER_ADDR = 'ide-education.cloud.shiftr.io'
+MQTT_BROKER_PORT = 1883
+MQTT_USERNAME = 'ide-education'
+MQTT_PASSWORD = 'Sy0L85iwSSgc1P7E'
 # Print settings
 DPI = 300
 W_IN = 4
 H_IN = 6
 
-sio = socketio.Client()
+client = mqtt.Client(client_id="DELPHI-printer")
+client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code "+str(rc))
+    client.subscribe("DELPHI/system_1/print")
+
+def on_message(client, userdata, msg):
+    print(f"Message received on topic {msg.topic}")
+    if msg.topic == 'DELPHI/system_1/print':
+        try:
+            image_data_base64 = msg.payload
+            image_data = base64.b64decode(image_data_base64)
+
+            current_directory = os.path.dirname(os.path.abspath(__file__))
+            raw_image_path = os.path.join(current_directory, 'raw_image.png')
+            output_image_path = os.path.join(current_directory, 'print_processed.png')
+
+            with open(raw_image_path, 'wb') as file:
+                file.write(image_data)
+
+            with Image.open(BytesIO(image_data)) as image:
+                preprocess_print(image, output_image_path)
+                process_print(output_image_path)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
 
 def execute_command(command):
-
     subprocess.Popen(
         command, 
         shell=True, 
@@ -53,7 +79,7 @@ else:
 def on_key_event(e):
     if e.name == 'q':
         print("Closing connection...")
-        sio.disconnect()
+        client.disconnect()
         exit()
 
 def resize_and_crop(image, output_path, page_dimensions):
@@ -102,39 +128,9 @@ def process_print(output_image_path):
     # Execute the command
     execute_command(command)
 
-
-@sio.event
-def connect():
-    print("Connected to server")
-    sio.emit('printer_connect') 
-
-@sio.event
-def disconnect():
-    print("Disconnected from server")
-
-@sio.on('print')
-def print_image(*args):
-    data = args[0]
-    try:
-        image_data_url = data['image']
-        system_id = data['system_id']
-        current_directory = os.path.dirname(os.path.abspath(__file__))
-        raw_image_path = os.path.join(current_directory, 'raw_image.png')
-        output_image_path = os.path.join(current_directory, 'print_processed.png')
-
-        # Save the raw image data
-        with open(raw_image_path, 'wb') as file:
-            file.write(image_data_url)
-
-        # Create an Image object from the decoded data
-        with Image.open(BytesIO(image_data_url)) as image:
-            # Preprocess and print the image
-            preprocess_print(image, output_image_path)
-
-        process_print(output_image_path)
-    except KeyError:
-        print("Error: Missing data in print event")
-
-sio.connect(SOCKETIO_SERVER_ADDR)
 keyboard.on_press(on_key_event)
-sio.wait()
+client.on_connect = on_connect
+client.on_message = on_message
+
+client.connect(MQTT_BROKER_ADDR, MQTT_BROKER_PORT, 60)
+client.loop_forever()
