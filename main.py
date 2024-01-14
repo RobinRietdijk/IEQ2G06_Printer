@@ -19,16 +19,23 @@ DPI = 300
 W_IN = 4
 H_IN = 6
 
+processing_image = False
+print_image = None
+print_thread = None
+
 client = mqtt.Client(client_id="DELPHI-printer")
 client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
-    client.subscribe("DELPHI/system_1/print")
+    client.subscribe("DELPHI/system_1/image_data")
+    client.subscribe("DELPHI/system_1/state")
 
 def on_message(client, userdata, msg):
+    global processing_image, print_image
     print(f"Message received on topic {msg.topic}")
-    if msg.topic == 'DELPHI/system_1/print':
+    if msg.topic == 'DELPHI/system_1/image_data':
         try:
+            processing_image = True
             image_data_base64 = msg.payload
             image_data = base64.b64decode(image_data_base64)
 
@@ -41,10 +48,24 @@ def on_message(client, userdata, msg):
 
             with Image.open(BytesIO(image_data)) as image:
                 preprocess_print(image, output_image_path)
-                process_print(output_image_path)
+                print_image = output_image_path
         except Exception as e:
             print(f"An error occurred: {e}")
+        finally:
+            processing_image = False
+    if msg.topic == 'DELPHI/system_1/state' and msg.payload.decode('utf-8') == 'printing':
+        if print_thread is not None:
+            return
+        print_thread = threading.Thread(target=handle_printing)
+        print_thread.start()
 
+def handle_printing():
+    global print_image, print_thread
+    while processing_image:
+        time.sleep(1)
+    if print_image:
+        process_print(print_image)
+    print_thread = None
 
 def execute_command(command):
     subprocess.Popen(
