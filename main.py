@@ -10,10 +10,10 @@ from PIL import Image
 from tkinter import filedialog
 import tkinter as tk
 
-MQTT_BROKER_ADDR = 'ide-education.cloud.shiftr.io'
+MQTT_BROKER_ADDR = 'rjrietdijk.com'
 MQTT_BROKER_PORT = 1883
-MQTT_USERNAME = 'ide-education'
-MQTT_PASSWORD = 'Sy0L85iwSSgc1P7E'
+MQTT_USERNAME = 'ieq2g06'
+MQTT_PASSWORD = 'ilikenuts'
 # Print settings
 DPI = 300
 W_IN = 4
@@ -31,24 +31,29 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe("DELPHI/system_1/state")
 
 def on_message(client, userdata, msg):
-    global processing_image, print_image
+    global processing_image, print_image, print_thread
     print(f"Message received on topic {msg.topic}")
     if msg.topic == 'DELPHI/system_1/image_data':
+        processing_image = True
         try:
-            processing_image = True
-            image_data_base64 = msg.payload
-            image_data = base64.b64decode(image_data_base64)
+            payload_str = msg.payload.decode('utf-8')
+            if payload_str.startswith('data:image/png;base64,'):
+                # Extract base64-encoded data after the comma
+                image_data_base64 = payload_str.split(',')[1]
 
-            current_directory = os.path.dirname(os.path.abspath(__file__))
-            raw_image_path = os.path.join(current_directory, 'raw_image.png')
-            output_image_path = os.path.join(current_directory, 'print_processed.png')
+                # Decode base64 data
+                image_data = base64.b64decode(image_data_base64)
 
-            with open(raw_image_path, 'wb') as file:
-                file.write(image_data)
+                current_directory = os.path.dirname(os.path.abspath(__file__))
+                raw_image_path = os.path.join(current_directory, 'raw_image.png')
+                output_image_path = os.path.join(current_directory, 'print_processed.png')
 
-            with Image.open(BytesIO(image_data)) as image:
-                preprocess_print(image, output_image_path)
-                print_image = output_image_path
+                with open(raw_image_path, 'wb') as file:
+                    file.write(image_data)
+
+                with Image.open(BytesIO(image_data)) as image:
+                    preprocess_print(image, output_image_path)
+                    print_image = output_image_path
         except Exception as e:
             print(f"An error occurred: {e}")
         finally:
